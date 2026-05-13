@@ -3,10 +3,15 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 import 'package:yaml/yaml.dart';
 
-/// Default APK filename template when none is configured in `pubspec.yaml`.
-const defaultOutputNameTemplate =
+const _defaultOutputStem =
     r'App${appId}_${appname}_v${versionName}'
-    r'(${versionCode})_${buildDate}_${flavor}_${buildType}.apk';
+    r'(${versionCode})_${buildDate}_${flavor}_${buildType}';
+
+/// Default APK filename template when none is configured in `pubspec.yaml`.
+const defaultOutputNameTemplate = '$_defaultOutputStem.apk';
+
+/// Default AAB filename template when none is configured in `pubspec.yaml`.
+const defaultBundleOutputNameTemplate = '$_defaultOutputStem.aab';
 
 /// Settings read from the `build_ntd:` section of `pubspec.yaml`.
 class BuildConfig {

@@ -88,4 +88,39 @@ void main() {
       );
     });
   });
+
+  group('enforceExtension', () {
+    test('appends the extension when none is present', () {
+      expect(enforceExtension('App780_Muslim', '.apk'), 'App780_Muslim.apk');
+      expect(enforceExtension('App780_Muslim', '.aab'), 'App780_Muslim.aab');
+    });
+
+    test('is a no-op when the extension already matches', () {
+      expect(enforceExtension('foo.apk', '.apk'), 'foo.apk');
+      expect(enforceExtension('foo.aab', '.aab'), 'foo.aab');
+    });
+
+    test('swaps .apk for .aab and vice versa', () {
+      expect(enforceExtension('foo.apk', '.aab'), 'foo.aab');
+      expect(enforceExtension('foo.aab', '.apk'), 'foo.apk');
+    });
+
+    test('treats the extension match as case-insensitive', () {
+      expect(enforceExtension('foo.APK', '.aab'), 'foo.aab');
+      expect(enforceExtension('foo.Aab', '.apk'), 'foo.apk');
+    });
+
+    test('only swaps the trailing extension, not embedded ones', () {
+      expect(enforceExtension('App.apk.bak', '.aab'), 'App.apk.bak.aab');
+    });
+  });
+
+  group('default bundle template', () {
+    test('differs from the APK default only in extension', () {
+      expect(
+        defaultBundleOutputNameTemplate,
+        defaultOutputNameTemplate.replaceAll('.apk', '.aab'),
+      );
+    });
+  });
 }

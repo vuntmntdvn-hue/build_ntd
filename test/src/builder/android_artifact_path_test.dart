@@ -58,4 +58,85 @@ void main() {
     });
   });
 
+  group('findAabArtifact', () {
+    test('locates the canonical AAB under the mode-named folder', () {
+      final expected = p.join(
+        root.path,
+        'build',
+        'app',
+        'outputs',
+        'bundle',
+        'release',
+        'app-release.aab',
+      );
+      _touch(expected);
+
+      final found = findAabArtifact(root.path, mode: 'release');
+
+      expect(found, isNotNull);
+      expect(p.equals(found!.path, expected), isTrue);
+    });
+
+    test('locates the flavored AAB under {flavor}{Mode}/', () {
+      // Gradle camelCases the folder name when a flavor is present.
+      final expected = p.join(
+        root.path,
+        'build',
+        'app',
+        'outputs',
+        'bundle',
+        'devRelease',
+        'app-dev-release.aab',
+      );
+      _touch(expected);
+
+      final found =
+          findAabArtifact(root.path, mode: 'release', flavor: 'dev');
+
+      expect(found, isNotNull);
+      expect(p.equals(found!.path, expected), isTrue);
+    });
+
+    test('handles debug mode folder naming', () {
+      final expected = p.join(
+        root.path,
+        'build',
+        'app',
+        'outputs',
+        'bundle',
+        'proDebug',
+        'app-pro-debug.aab',
+      );
+      _touch(expected);
+
+      final found = findAabArtifact(root.path, mode: 'debug', flavor: 'pro');
+
+      expect(found, isNotNull);
+      expect(p.equals(found!.path, expected), isTrue);
+    });
+
+    test('returns null when no AAB exists', () {
+      expect(findAabArtifact(root.path, mode: 'release'), isNull);
+    });
+
+    test('falls back to a single non-canonical AAB in the bundle dir', () {
+      // Edge case: Flutter sometimes drops a single oddly-named file. As long
+      // as there's exactly one `.aab` in the expected directory, return it.
+      final unexpected = p.join(
+        root.path,
+        'build',
+        'app',
+        'outputs',
+        'bundle',
+        'release',
+        'something-weird.aab',
+      );
+      _touch(unexpected);
+
+      final found = findAabArtifact(root.path, mode: 'release');
+
+      expect(found, isNotNull);
+      expect(p.equals(found!.path, unexpected), isTrue);
+    });
+  });
 }

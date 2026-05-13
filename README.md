@@ -3,11 +3,12 @@
 [![style: very good analysis][very_good_analysis_badge]][very_good_analysis_link]
 [![License: MIT][license_badge]][license_link]
 
-A Dart CLI that wraps `flutter build apk` and copies the produced APK to a
-filename derived from a template.
+A Dart CLI that wraps `flutter build apk` / `flutter build appbundle` and
+copies the produced artifact to a filename derived from a template.
 
 ```text
 App780_Muslim_v1.0.0(1)_2026.05.11_dev_release.apk
+App780_Muslim_v1.0.0(1)_2026.05.11_dev_release.aab
 ```
 
 ---
@@ -47,10 +48,14 @@ build_ntd:
 From the Flutter project root:
 
 ```sh
-build_ntd build --flavor dev -t lib/main_dev.dart
+# APK
+build_ntd build  --flavor dev -t lib/main_dev.dart
+
+# AAB
+build_ntd bundle --flavor dev -t lib/main_dev.dart
 ```
 
-Common options:
+Both commands accept the same options:
 
 ```text
 --flavor       Flutter build flavor (e.g. dev, pro)
@@ -61,12 +66,18 @@ Common options:
 --output-name  Override the filename template
 ```
 
+`output_name:` and `output_dir:` in `pubspec.yaml` are shared between the
+two commands. The artifact extension (`.apk` / `.aab`) is appended — or
+swapped in — automatically, so a template like `App${appname}.apk` works
+for `bundle` too (it becomes `App${appname}.aab`).
+
 ### Template variables
 
-The default template is:
+The default templates are:
 
 ```text
 App${appId}_${appname}_v${versionName}(${versionCode})_${buildDate}_${flavor}_${buildType}.apk
+App${appId}_${appname}_v${versionName}(${versionCode})_${buildDate}_${flavor}_${buildType}.aab
 ```
 
 | Variable        | Source                                                      |

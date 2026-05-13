@@ -110,7 +110,8 @@ abstract class AndroidBuildCommand extends Command<int> {
         overrideTemplate ?? config.outputNameTemplate ?? defaultOutputName;
     final String renamedFile;
     try {
-      renamedFile = renderTemplate(template, variables);
+      final rendered = renderTemplate(template, variables);
+      renamedFile = enforceExtension(rendered, artifactExtension);
     } on TemplateException catch (e) {
       _logger.err(e.message);
       return ExitCode.usage.code;

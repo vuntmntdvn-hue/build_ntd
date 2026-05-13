@@ -7,7 +7,8 @@ import 'package:mason_logger/mason_logger.dart';
 
 const executableName = 'build_ntd';
 const packageName = 'build_ntd';
-const description = 'Build a Flutter APK and rename it from a template.';
+const description =
+    'Build a Flutter APK or AAB and rename it from a template.';
 
 /// {@template build_ntd_command_runner}
 /// A [CommandRunner] for the CLI.
@@ -36,6 +37,7 @@ class BuildNtdCommandRunner extends CompletionCommandRunner<int> {
 
     // Add sub commands
     addCommand(BuildCommand(logger: _logger));
+    addCommand(BundleCommand(logger: _logger));
   }
 
   @override

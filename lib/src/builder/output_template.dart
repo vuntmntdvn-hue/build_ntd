@@ -30,3 +30,17 @@ class TemplateException implements Exception {
   @override
   String toString() => message;
 }
+
+/// Ensures [rendered] ends with [wantedExt]. If it already ends with another
+/// known Android artifact extension (`.apk` or `.aab`), that one is replaced;
+/// otherwise [wantedExt] is appended. Comparison is case-insensitive.
+String enforceExtension(String rendered, String wantedExt) {
+  const knownExts = ['.apk', '.aab'];
+  final lower = rendered.toLowerCase();
+  for (final ext in knownExts) {
+    if (lower.endsWith(ext)) {
+      return rendered.substring(0, rendered.length - ext.length) + wantedExt;
+    }
+  }
+  return rendered + wantedExt;
+}
