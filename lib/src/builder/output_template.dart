@@ -31,6 +31,21 @@ class TemplateException implements Exception {
   String toString() => message;
 }
 
+/// Cleans up a rendered filename so empty placeholders don't leave behind
+/// runs of `_` (e.g. an empty `${flavor}` between two underscores in the
+/// default template). Collapses any sequence of underscores to a single one
+/// and strips leading/trailing underscores from the basename — the extension
+/// is preserved untouched.
+String tidyOutputName(String rendered) {
+  final dot = rendered.lastIndexOf('.');
+  final stem = dot == -1 ? rendered : rendered.substring(0, dot);
+  final ext = dot == -1 ? '' : rendered.substring(dot);
+  final cleaned = stem
+      .replaceAll(RegExp('_+'), '_')
+      .replaceAll(RegExp(r'^_+|_+$'), '');
+  return '$cleaned$ext';
+}
+
 /// Ensures [rendered] ends with [wantedExt]. If it already ends with another
 /// known Android artifact extension (`.apk` or `.aab`), that one is replaced;
 /// otherwise [wantedExt] is appended. Comparison is case-insensitive.

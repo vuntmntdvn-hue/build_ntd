@@ -7,8 +7,8 @@ A Dart CLI that wraps `flutter build apk` / `flutter build appbundle` and
 copies the produced artifact to a filename derived from a template.
 
 ```text
-App780_Muslim_v1.0.0(1)_2026.05.11_dev_release.apk
-App780_Muslim_v1.0.0(1)_2026.05.11_dev_release.aab
+App780_Muslim_v1.0.0(1)_2026.05.13_14.30_dev_release.apk
+App780_Muslim_v1.0.0(1)_2026.05.13_14.30_dev_release.aab
 ```
 
 ---
@@ -62,7 +62,8 @@ build_ntd bump 12
 Both commands accept the same options:
 
 ```text
---flavor       Flutter build flavor (e.g. dev, pro)
+--flavor       Flutter build flavor — whatever names your project declares
+               (e.g. dev, production, etc.)
 --mode         release (default), debug, profile
 --target, -t   Entry-point Dart file
 --dart-define  Forwarded as --dart-define=key=value (repeatable)
@@ -92,20 +93,25 @@ for `bundle` too (it becomes `App${appname}.aab`).
 The default templates are:
 
 ```text
-App${appId}_${appname}_v${versionName}(${versionCode})_${buildDate}_${flavor}_${buildType}.apk
-App${appId}_${appname}_v${versionName}(${versionCode})_${buildDate}_${flavor}_${buildType}.aab
+App${appId}_${appname}_v${versionName}(${versionCode})_${buildDate}_${buildTime}_${flavor}_${buildType}.apk
+App${appId}_${appname}_v${versionName}(${versionCode})_${buildDate}_${buildTime}_${flavor}_${buildType}.aab
 ```
 
-| Variable        | Source                                                      |
-|-----------------|-------------------------------------------------------------|
-| `${appId}`      | `build_ntd.app_id` in `pubspec.yaml`                        |
-| `${appname}`    | `build_ntd.app_name` in `pubspec.yaml`                      |
-| `${versionName}`| `android/app/build.gradle[.kts]` (or pubspec `version:`)    |
-| `${versionCode}`| `android/app/build.gradle[.kts]` (or pubspec `version:`)    |
-| `${buildDate}`  | `DateTime.now()` as `YYYY.MM.DD`                            |
-| `${buildTime}`  | `DateTime.now()` as `HH.mm` (opt-in; reference in template) |
-| `${flavor}`     | `--flavor` CLI flag                                         |
-| `${buildType}`  | `--mode` CLI flag                                           |
+| Variable        | Source                                                   |
+|-----------------|----------------------------------------------------------|
+| `${appId}`      | `build_ntd.app_id` in `pubspec.yaml`                     |
+| `${appname}`    | `build_ntd.app_name` in `pubspec.yaml`                   |
+| `${versionName}`| `android/app/build.gradle[.kts]` (or pubspec `version:`) |
+| `${versionCode}`| `android/app/build.gradle[.kts]` (or pubspec `version:`) |
+| `${buildDate}`  | `DateTime.now()` as `YYYY.MM.DD`                         |
+| `${buildTime}`  | `DateTime.now()` as `HH.mm`                              |
+| `${flavor}`     | `--flavor` CLI flag (empty when not passed)              |
+| `${buildType}`  | `--mode` CLI flag                                        |
+
+Empty placeholders (e.g. `${flavor}` when `--flavor` isn't passed) don't
+leave behind double underscores — runs of `_` in the basename are
+collapsed automatically, so `App780_..._14.30__release.apk` becomes
+`App780_..._14.30_release.apk`.
 
 Unknown placeholders fail the build with a clear message — no silent
 `Appnull_...apk` outputs.

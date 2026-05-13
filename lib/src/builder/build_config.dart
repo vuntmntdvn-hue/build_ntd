@@ -5,7 +5,7 @@ import 'package:yaml/yaml.dart';
 
 const _defaultOutputStem =
     r'App${appId}_${appname}_v${versionName}'
-    r'(${versionCode})_${buildDate}_${flavor}_${buildType}';
+    r'(${versionCode})_${buildDate}_${buildTime}_${flavor}_${buildType}';
 
 /// Default APK filename template when none is configured in `pubspec.yaml`.
 const defaultOutputNameTemplate = '$_defaultOutputStem.apk';

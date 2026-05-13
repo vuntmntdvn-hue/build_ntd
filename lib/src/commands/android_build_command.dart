@@ -18,7 +18,8 @@ abstract class AndroidBuildCommand extends Command<int> {
     argParser
       ..addOption(
         'flavor',
-        help: 'Flutter build flavor (e.g. dev, pro).',
+        help: 'Flutter build flavor — whatever names your project '
+            'declares (e.g. dev, production).',
       )
       ..addOption(
         'mode',
@@ -117,7 +118,8 @@ abstract class AndroidBuildCommand extends Command<int> {
     final String renamedFile;
     try {
       final rendered = renderTemplate(template, variables);
-      renamedFile = enforceExtension(rendered, artifactExtension);
+      final tidied = tidyOutputName(rendered);
+      renamedFile = enforceExtension(tidied, artifactExtension);
     } on TemplateException catch (e) {
       _logger.err(e.message);
       return ExitCode.usage.code;

@@ -35,7 +35,10 @@ void main() {
         'buildType': 'release',
       });
 
-      expect(result, 'App780_Muslim_v1.0.0(1)_2026.05.07_pro_release.apk');
+      expect(
+        result,
+        'App780_Muslim_v1.0.0(1)_2026.05.07_14.30_pro_release.apk',
+      );
     });
 
     test('substitutes the same variable multiple times', () {
@@ -85,6 +88,54 @@ void main() {
       expect(
         renderTemplate(r'${foo-bar}', {'foo-bar': 'x'}),
         r'${foo-bar}',
+      );
+    });
+  });
+
+  group('tidyOutputName', () {
+    test('collapses runs of underscores in the basename', () {
+      expect(tidyOutputName('App__release.apk'), 'App_release.apk');
+      expect(tidyOutputName('App___release.aab'), 'App_release.aab');
+    });
+
+    test('strips leading and trailing underscores from the basename', () {
+      expect(tidyOutputName('_App_release.apk'), 'App_release.apk');
+      expect(tidyOutputName('App_release_.apk'), 'App_release.apk');
+      expect(tidyOutputName('__App_release__.apk'), 'App_release.apk');
+    });
+
+    test('preserves the extension untouched', () {
+      // The dot between basename and extension is the split point — the
+      // extension itself never has underscores collapsed or trimmed.
+      expect(tidyOutputName('App_v1.0.0(1)_release.apk'),
+          'App_v1.0.0(1)_release.apk');
+    });
+
+    test('handles names without an extension', () {
+      expect(tidyOutputName('App__release'), 'App_release');
+      expect(tidyOutputName('clean'), 'clean');
+    });
+
+    test('is idempotent on already-clean names', () {
+      expect(tidyOutputName('App_release.apk'), 'App_release.apk');
+    });
+
+    test('renders the default template cleanly when flavor is empty', () {
+      final rendered = renderTemplate(defaultOutputNameTemplate, {
+        'appId': '780',
+        'appname': 'Muslim',
+        'versionName': '1.0.0',
+        'versionCode': '1',
+        'buildDate': '2026.05.13',
+        'buildTime': '14.30',
+        'flavor': '',
+        'buildType': 'release',
+      });
+
+      // Without tidy this would be `..._14.30__release.apk`.
+      expect(
+        tidyOutputName(rendered),
+        'App780_Muslim_v1.0.0(1)_2026.05.13_14.30_release.apk',
       );
     });
   });
