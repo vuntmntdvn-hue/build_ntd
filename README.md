@@ -53,6 +53,10 @@ build_ntd build  --flavor dev -t lib/main_dev.dart
 
 # AAB
 build_ntd bundle --flavor dev -t lib/main_dev.dart
+
+# Bump versionCode by 1, or set it explicitly
+build_ntd bump
+build_ntd bump 12
 ```
 
 Both commands accept the same options:
@@ -93,6 +97,26 @@ App${appId}_${appname}_v${versionName}(${versionCode})_${buildDate}_${flavor}_${
 
 Unknown placeholders fail the build with a clear message — no silent
 `Appnull_...apk` outputs.
+
+## `bump` — Android versionCode
+
+```sh
+build_ntd bump        # current + 1
+build_ntd bump 12     # set to exactly 12
+```
+
+Always writes a literal value into `android/app/build.gradle[.kts]` (any
+`flutterVersionCode.toInteger()` reference is replaced). If
+`pubspec.yaml` has a `version:` field, its `+N` is updated to match
+(appended if missing). The rest of each file is left byte-identical, so
+comments and surrounding lines are preserved.
+
+If `bump` is run with no argument and neither file has a readable value,
+it errors out — pass an explicit value to seed the first bump:
+
+```sh
+build_ntd bump 1
+```
 
 ## Running Tests
 
