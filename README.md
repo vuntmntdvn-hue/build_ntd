@@ -27,12 +27,21 @@ Make sure pub's global bin directory is on your `PATH`
 
 ## Configure
 
-Inside the Flutter project you want to build, add a `build_ntd:` section to
-`pubspec.yaml`:
+The fastest path: run
+
+```sh
+build_ntd sample
+```
+
+from your Flutter project root. It appends a fully-commented `build_ntd:`
+section to `pubspec.yaml`, auto-filling `app_name` from your project's
+`name:` and using a placeholder for `app_id`. Edit `app_id` and you're done.
+
+Or write the section by hand:
 
 ```yaml
 build_ntd:
-  app_id: 780              # required
+  app_id: "780"            # required
   app_name: Muslim         # required
   # output_name: "App${appId}_${appname}.apk"   # optional override
   # output_dir: ./dist                          # optional copy destination

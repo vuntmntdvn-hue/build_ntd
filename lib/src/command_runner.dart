@@ -39,6 +39,7 @@ class BuildNtdCommandRunner extends CompletionCommandRunner<int> {
     addCommand(ApkCommand(logger: _logger));
     addCommand(BundleCommand(logger: _logger));
     addCommand(BumpCommand(logger: _logger));
+    addCommand(SampleCommand(logger: _logger));
   }
 
   @override
