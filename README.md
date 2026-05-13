@@ -105,14 +105,23 @@ build_ntd bump        # current + 1
 build_ntd bump 12     # set to exactly 12
 ```
 
-Always writes a literal value into `android/app/build.gradle[.kts]` (any
-`flutterVersionCode.toInteger()` reference is replaced). If
-`pubspec.yaml` has a `version:` field, its `+N` is updated to match
-(appended if missing). The rest of each file is left byte-identical, so
-comments and surrounding lines are preserved.
+`bump` reads the current value the same way `apk` and `bundle` do — gradle
+literal first, then `pubspec.yaml` `version: x.y.z+N` — and writes back to
+every file that has a writable copy of the value, keeping them in sync:
 
-If `bump` is run with no argument and neither file has a readable value,
-it errors out — pass an explicit value to seed the first bump:
+- If `android/app/build.gradle[.kts]` has a literal `versionCode N`, it's
+  updated.
+- A `flutterVersionCode.toInteger()` (or other dynamic) reference is
+  **left alone** so the Flutter scaffolding keeps working — the new
+  pubspec value flows through at build time.
+- If `pubspec.yaml` has a `version:` field, its `+N` is updated (appended
+  if missing).
+
+The rest of each file is byte-identical, so comments and surrounding
+lines are preserved.
+
+If neither file has a readable value, pass an explicit value to seed the
+first bump:
 
 ```sh
 build_ntd bump 1

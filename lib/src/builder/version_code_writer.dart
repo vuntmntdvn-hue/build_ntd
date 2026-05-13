@@ -23,16 +23,20 @@ class VersionCodeBump {
 
 /// Bumps the Android `versionCode` for the Flutter project at [projectRoot].
 ///
-/// - If [explicit] is supplied, sets the literal to that value. Must be `> 0`.
+/// - If [explicit] is supplied, sets the value to it. Must be `> 0`.
 /// - Otherwise reads the current value (gradle literal first, then pubspec
-///   `version: x.y.z+N`) and adds 1.
+///   `version: x.y.z+N`, matching how `apk` and `bundle` read it) and adds 1.
 ///
-/// Always writes a literal into `android/app/build.gradle[.kts]` — dynamic
-/// references like `flutterVersionCode.toInteger()` get replaced. If
-/// `pubspec.yaml` has a `version:` field, its `+N` is updated to match (or
-/// appended if missing).
+/// Writes to every file that holds a writable copy of the value, keeping them
+/// in sync:
 ///
-/// Throws [VersionCodeException] for unrecoverable errors.
+/// - If `android/app/build.gradle[.kts]` has a **literal** `versionCode N`,
+///   it's updated. Dynamic references like `flutterVersionCode.toInteger()`
+///   are left intact so the Flutter scaffolding still works.
+/// - If `pubspec.yaml` has a `version:` field, its `+N` is updated (appended
+///   if missing).
+///
+/// Errors if no file has a writable target.
 VersionCodeBump bumpVersionCode(String projectRoot, {int? explicit}) {
   if (explicit != null && explicit <= 0) {
     throw VersionCodeException(
@@ -50,40 +54,51 @@ VersionCodeBump bumpVersionCode(String projectRoot, {int? explicit}) {
 
   final pubspecFile = File(p.join(projectRoot, 'pubspec.yaml'));
   final gradleSource = gradleFile.readAsStringSync();
+  final pubspecSource =
+      pubspecFile.existsSync() ? pubspecFile.readAsStringSync() : null;
 
-  // Determine the current value. Used both for `+1` and for the log message.
+  // Same priority `GradleVersionInfo` uses for reading.
   final fromGradle = _readGradleLiteral(gradleSource);
-  final fromPubspec = pubspecFile.existsSync()
-      ? _readPubspecVersionCode(pubspecFile.readAsStringSync())
-      : null;
+  final fromPubspec =
+      pubspecSource != null ? _readPubspecVersionCode(pubspecSource) : null;
   final oldValue = fromGradle ?? fromPubspec;
 
   if (explicit == null && oldValue == null) {
     throw VersionCodeException(
       'Cannot determine current versionCode. Neither '
       'android/app/build.gradle[.kts] has a literal value nor '
-      'pubspec.yaml has a `version: x.y.z+N` line. '
+      'pubspec.yaml has a `version:` line. '
       'Pass an explicit value, e.g. `build_ntd bump 1`.',
     );
   }
 
   final newValue = explicit ?? (oldValue! + 1);
-
   final updated = <String>[];
 
+  // Update the gradle literal in place if there is one. Dynamic refs are
+  // left alone — they'll pick up the new pubspec value at build time.
   final newGradle = _writeGradleLiteral(gradleSource, newValue);
-  if (newGradle != null) {
+  if (newGradle != null && newGradle != gradleSource) {
     gradleFile.writeAsStringSync(newGradle);
     updated.add(p.relative(gradleFile.path, from: projectRoot));
   }
 
-  if (pubspecFile.existsSync()) {
-    final source = pubspecFile.readAsStringSync();
-    final newPubspec = _writePubspecVersionCode(source, newValue);
-    if (newPubspec != null && newPubspec != source) {
+  // Update pubspec `version:` if it has one — keeps both sources in sync.
+  if (pubspecSource != null) {
+    final newPubspec = _writePubspecVersionCode(pubspecSource, newValue);
+    if (newPubspec != null && newPubspec != pubspecSource) {
       pubspecFile.writeAsStringSync(newPubspec);
       updated.add(p.relative(pubspecFile.path, from: projectRoot));
     }
+  }
+
+  if (updated.isEmpty) {
+    throw VersionCodeException(
+      'Nothing to update. android/app/build.gradle[.kts] uses a dynamic '
+      'reference and pubspec.yaml has no `version:` field. Add a '
+      '`version: 1.0.0+1` line to pubspec.yaml or replace the gradle '
+      'dynamic ref with a literal.',
+    );
   }
 
   return VersionCodeBump(
@@ -108,24 +123,31 @@ int? _readGradleLiteral(String source) {
   return m == null ? null : int.parse(m.group(1)!);
 }
 
+/// Returns the build number from `version: x.y.z+N` in pubspec. If the
+/// `version:` line is present but has no `+N`, returns `1` to mirror Flutter
+/// (and `GradleVersionInfo`'s) default. Returns `null` when there is no
+/// `version:` field at all.
 int? _readPubspecVersionCode(String source) {
   final doc = loadYaml(source);
   if (doc is! YamlMap) return null;
   final version = doc['version']?.toString();
   if (version == null) return null;
   final plus = version.indexOf('+');
-  if (plus == -1) return null;
+  if (plus == -1) return 1;
   return int.tryParse(version.substring(plus + 1));
 }
 
-/// Rewrites the first `versionCode <whatever>` line to `versionCode $newValue`,
-/// preserving the assignment style (` ` vs ` = `). Returns `null` if no
-/// `versionCode` line was found.
+/// Rewrites the first literal `versionCode <number>` line to
+/// `versionCode $newValue`, preserving the assignment style (` ` vs ` = `).
+///
+/// Returns `null` if there is no literal versionCode line — dynamic
+/// references like `versionCode flutterVersionCode.toInteger()` are left
+/// untouched so they keep reading from pubspec.
 String? _writeGradleLiteral(String source, int newValue) {
-  // Capture leading whitespace and the separator so Kotlin DSL (`= 5`) and
-  // Groovy (` 5`) both round-trip correctly.
+  // The trailing `"?\d+"?` is the literal value. Lines with a non-numeric
+  // value (e.g. a dynamic reference) won't match.
   final re = RegExp(
-    r'^(\s*)versionCode(\s*=?\s*)\S+.*$',
+    r'^(\s*)versionCode(\s*=?\s*)"?\d+"?',
     multiLine: true,
   );
   final m = re.firstMatch(source);

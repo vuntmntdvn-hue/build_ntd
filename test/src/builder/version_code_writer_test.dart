@@ -100,11 +100,12 @@ android {
       );
     });
 
-    test('forces a literal when gradle uses flutterVersionCode dynamic ref',
-        () {
-      project
-        ..writePubspec('name: example\nversion: 1.0.0+5\n')
-        ..writeGradle('''
+    test(
+      'preserves gradle dynamic ref and updates pubspec only',
+      () {
+        project
+          ..writePubspec('name: example\nversion: 1.0.0+5\n')
+          ..writeGradle('''
 android {
     defaultConfig {
         versionCode flutterVersionCode.toInteger()
@@ -113,21 +114,22 @@ android {
 }
 ''');
 
-      final result = bumpVersionCode(project.path);
+        final result = bumpVersionCode(project.path);
 
-      expect(result.oldValue, 5);
-      expect(result.newValue, 6);
+        expect(result.oldValue, 5);
+        expect(result.newValue, 6);
 
-      final gradle = project.readGradle();
-      expect(gradle, contains('versionCode 6'));
-      expect(gradle, isNot(contains('flutterVersionCode')));
+        // Gradle dynamic ref is intentionally untouched — it'll resolve
+        // through the new pubspec value at build time.
+        final gradle = project.readGradle();
+        expect(gradle, contains('versionCode flutterVersionCode.toInteger()'));
+        expect(gradle, contains('versionName flutterVersionName'));
 
-      // versionName ref must be left alone.
-      expect(gradle, contains('versionName flutterVersionName'));
-
-      // pubspec is updated alongside.
-      expect(project.readPubspec(), contains('version: 1.0.0+6'));
-    });
+        // pubspec carries the bumped value.
+        expect(project.readPubspec(), contains('version: 1.0.0+6'));
+        expect(result.filesUpdated.single, contains('pubspec.yaml'));
+      },
+    );
 
     test('updates both gradle and pubspec when both have a value', () {
       project
@@ -162,6 +164,34 @@ android {
 
       expect(project.readPubspec(), contains('version: 1.0.0+6'));
     });
+
+    test(
+      'defaults pubspec build number to 1 when bumping from a dynamic ref',
+      () {
+        // Gradle has a dynamic ref (no literal), pubspec has `version:` but
+        // no `+N`. The read should default to 1 (matching GradleVersionInfo),
+        // and bump should produce `version: 1.0.0+2`.
+        project
+          ..writePubspec('name: example\nversion: 1.0.0\n')
+          ..writeGradle('''
+android {
+    defaultConfig {
+        versionCode flutterVersionCode.toInteger()
+    }
+}
+''');
+
+        final result = bumpVersionCode(project.path);
+
+        expect(result.oldValue, 1);
+        expect(result.newValue, 2);
+        expect(project.readPubspec(), contains('version: 1.0.0+2'));
+        expect(
+          project.readGradle(),
+          contains('versionCode flutterVersionCode.toInteger()'),
+        );
+      },
+    );
 
     test('does not touch pubspec when it has no `version:` field', () {
       project
@@ -240,10 +270,14 @@ android {
       expect(project.readPubspec(), contains('version: 1.0.0+100'));
     });
 
-    test('works even when no old value can be read', () {
-      project
-        ..writePubspec('name: example\n')
-        ..writeGradle('''
+    test(
+      'errors even with an explicit value when no writable target exists',
+      () {
+        // Gradle uses a dynamic ref (no literal to update) and pubspec has
+        // no `version:` field — there's nowhere to write the new value.
+        project
+          ..writePubspec('name: example\n')
+          ..writeGradle('''
 android {
     defaultConfig {
         versionCode flutterVersionCode.toInteger()
@@ -251,12 +285,44 @@ android {
 }
 ''');
 
-      final result = bumpVersionCode(project.path, explicit: 5);
+        expect(
+          () => bumpVersionCode(project.path, explicit: 5),
+          throwsA(
+            isA<VersionCodeException>().having(
+              (e) => e.message,
+              'message',
+              contains('Nothing to update'),
+            ),
+          ),
+        );
+      },
+    );
 
-      expect(result.oldValue, isNull);
-      expect(result.newValue, 5);
-      expect(project.readGradle(), contains('versionCode 5'));
-    });
+    test(
+      'writes into pubspec version even with no +N when explicit is given',
+      () {
+        project
+          ..writePubspec('name: example\nversion: 1.0.0\n')
+          ..writeGradle('''
+android {
+    defaultConfig {
+        versionCode flutterVersionCode.toInteger()
+    }
+}
+''');
+
+        final result = bumpVersionCode(project.path, explicit: 42);
+
+        expect(result.newValue, 42);
+        // Gradle dynamic ref is left alone.
+        expect(
+          project.readGradle(),
+          contains('versionCode flutterVersionCode.toInteger()'),
+        );
+        // pubspec gets `+42` appended.
+        expect(project.readPubspec(), contains('version: 1.0.0+42'));
+      },
+    );
 
     test('rejects zero and negative values', () {
       project.writeGradle('android { defaultConfig { versionCode 1 } }');
