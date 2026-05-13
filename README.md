@@ -68,7 +68,19 @@ Both commands accept the same options:
 --dart-define  Forwarded as --dart-define=key=value (repeatable)
 --output-dir   Override the destination directory
 --output-name  Override the filename template
+--no-copy      Skip copying the produced artifact to the clipboard
 ```
+
+On success, the renamed artifact is also copied to the system clipboard
+so you can paste it straight into a chat or upload dialog:
+
+- **Windows**: pasted as the file itself in Explorer (Set-Clipboard).
+- **macOS**: pasted as the file itself in Finder (osascript).
+- **Linux**: pasted as the path text via `wl-copy` or `xclip` if either
+  is installed; otherwise skipped with a note. True file-clipboard on
+  Linux varies by desktop environment and isn't handled.
+
+Pass `--no-copy` to disable on CI or scripts.
 
 `output_name:` and `output_dir:` in `pubspec.yaml` are shared between the
 two commands. The artifact extension (`.apk` / `.aab`) is appended — or

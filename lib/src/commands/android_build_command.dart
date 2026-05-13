@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:args/command_runner.dart';
 import 'package:build_ntd/src/builder/build_config.dart';
+import 'package:build_ntd/src/builder/clipboard.dart';
 import 'package:build_ntd/src/builder/output_template.dart';
 import 'package:mason_logger/mason_logger.dart';
 import 'package:path/path.dart' as p;
@@ -44,6 +45,12 @@ abstract class AndroidBuildCommand extends Command<int> {
         help: 'Template for the renamed artifact. Overrides '
             '`build_ntd.output_name` in pubspec.yaml. The correct extension '
             'is appended (or substituted) automatically.',
+      )
+      ..addFlag(
+        'copy',
+        defaultsTo: true,
+        help: 'Copy the produced artifact to the system clipboard on '
+            'success. Use --no-copy to disable.',
       );
   }
 
@@ -153,7 +160,33 @@ abstract class AndroidBuildCommand extends Command<int> {
     }
 
     _logger.info(lightGreen.wrap('Artifact copied to $destPath'));
+
+    if (args['copy'] as bool) {
+      await _putOnClipboard(destPath);
+    }
+
     return ExitCode.success.code;
+  }
+
+  Future<void> _putOnClipboard(String path) async {
+    final result = await copyFileToClipboard(path);
+    switch (result.outcome) {
+      case ClipboardOutcome.copied:
+        final detail = result.detail == null ? '' : ' (${result.detail})';
+        _logger.info(darkGray.wrap('  copied to clipboard$detail'));
+      case ClipboardOutcome.toolMissing:
+        _logger.info(
+          darkGray.wrap('  clipboard skipped: ${result.detail}'),
+        );
+      case ClipboardOutcome.failed:
+        _logger.info(
+          darkGray.wrap('  clipboard copy failed: ${result.detail}'),
+        );
+      case ClipboardOutcome.unsupportedPlatform:
+        _logger.detail(
+          'Skipped clipboard: unsupported platform ${result.detail}',
+        );
+    }
   }
 
   Future<int> _runFlutter(List<String> args) async {
