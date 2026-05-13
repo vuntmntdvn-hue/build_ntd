@@ -15,6 +15,12 @@ class _Project {
     File(p.join(path, 'pubspec.yaml')).writeAsStringSync(contents);
   }
 
+  void writeGradle(String contents) {
+    final dir = Directory(p.join(path, 'android', 'app'))
+      ..createSync(recursive: true);
+    File(p.join(dir.path, 'build.gradle')).writeAsStringSync(contents);
+  }
+
   String readPubspec() =>
       File(p.join(path, 'pubspec.yaml')).readAsStringSync();
 
@@ -43,6 +49,7 @@ void main() {
     expect(updated, contains('# output_dir: ./dist'));
     expect(result.pubspecPath, 'pubspec.yaml');
     expect(result.appNameUsed, 'example');
+    expect(result.sectionAppended, isTrue);
   });
 
   test('auto-fills app_name from the host pubspec `name:` field', () {
@@ -63,25 +70,24 @@ void main() {
     expect(project.readPubspec(), contains('app_name: my_flutter_app'));
   });
 
-  test('refuses when a build_ntd: section already exists', () {
-    project.writePubspec('''
+  test(
+    'returns sectionAppended=false and leaves file intact when section exists',
+    () {
+      const existing = '''
 name: example
 build_ntd:
-  app_id: 999
+  app_id: "999"
   app_name: existing
-''');
+''';
+      project.writePubspec(existing);
 
-    expect(
-      () => writeBuildNtdSample(project.path),
-      throwsA(
-        isA<PubspecSampleException>().having(
-          (e) => e.message,
-          'message',
-          contains('already exists'),
-        ),
-      ),
-    );
-  });
+      final result = writeBuildNtdSample(project.path);
+
+      expect(result.sectionAppended, isFalse);
+      expect(result.appNameUsed, 'existing');
+      expect(project.readPubspec(), existing);
+    },
+  );
 
   test('throws when pubspec.yaml is missing', () {
     expect(
@@ -154,5 +160,119 @@ dependencies:
     final updated = project.readPubspec();
     // Starts straight with the section header — no leading blank line.
     expect(updated, startsWith('# Settings for the build_ntd CLI.'));
+  });
+
+  group('previewOutputNames', () {
+    test('uses values from an existing build_ntd: block plus gradle', () {
+      project
+        ..writePubspec('''
+name: example
+version: 1.0.0+5
+build_ntd:
+  app_id: "780"
+  app_name: Muslim
+''')
+        ..writeGradle('''
+android {
+    defaultConfig {
+        versionCode 5
+        versionName "1.0.0"
+    }
+}
+''');
+
+      final preview = previewOutputNames(project.path);
+
+      expect(preview, isNotNull);
+      // appId/appname taken straight from the block; versionName/Code from
+      // gradle. We don't pin the date/time portion — those move with the
+      // clock — so match on the stable surrounding segments.
+      expect(preview!.apk, startsWith('App780_Muslim_v1.0.0(5)_'));
+      expect(preview.apk, endsWith('_release.apk'));
+      expect(preview.bundle, startsWith('App780_Muslim_v1.0.0(5)_'));
+      expect(preview.bundle, endsWith('_release.aab'));
+    });
+
+    test('uses values just written when the block was missing', () {
+      project.writePubspec('name: muslim_app\nversion: 2.3.4+9\n');
+
+      writeBuildNtdSample(project.path);
+      // No gradle file — version should fall back to pubspec's value.
+      final preview = previewOutputNames(project.path);
+
+      expect(preview, isNotNull);
+      expect(preview!.apk, startsWith('App001_muslim_app_v2.3.4(9)_'));
+      expect(preview.apk, endsWith('_release.apk'));
+    });
+
+    test('uses placeholders when version info is unavailable', () {
+      project.writePubspec('''
+name: example
+build_ntd:
+  app_id: "780"
+  app_name: Muslim
+''');
+      // No gradle, no `version:` — versionName/Code can't be read.
+
+      final preview = previewOutputNames(project.path);
+
+      expect(preview, isNotNull);
+      expect(preview!.apk, contains('v<x.y.z>(<N>)'));
+    });
+
+    test('honors a custom output_name template and swaps extension', () {
+      project
+        ..writePubspec(r'''
+name: example
+version: 1.0.0+5
+build_ntd:
+  app_id: "780"
+  app_name: Muslim
+  output_name: "App${appId}_${appname}.apk"
+''')
+        ..writeGradle('''
+android {
+    defaultConfig {
+        versionCode 5
+        versionName "1.0.0"
+    }
+}
+''');
+
+      final preview = previewOutputNames(project.path)!;
+
+      expect(preview.apk, 'App780_Muslim.apk');
+      expect(preview.bundle, 'App780_Muslim.aab');
+    });
+
+    test('returns null when the build_ntd block is missing/incomplete', () {
+      project.writePubspec('name: example\n');
+
+      // No block at all → BuildConfig.load throws → preview returns null.
+      expect(previewOutputNames(project.path), isNull);
+    });
+
+    test('drops empty flavor cleanly (no double underscore)', () {
+      project
+        ..writePubspec('''
+name: example
+version: 1.0.0+5
+build_ntd:
+  app_id: "780"
+  app_name: Muslim
+''')
+        ..writeGradle('''
+android {
+    defaultConfig {
+        versionCode 5
+        versionName "1.0.0"
+    }
+}
+''');
+
+      final preview = previewOutputNames(project.path)!;
+
+      expect(preview.apk, isNot(contains('__')));
+    });
   });
 }

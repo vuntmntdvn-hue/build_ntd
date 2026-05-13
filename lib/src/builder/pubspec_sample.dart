@@ -1,32 +1,51 @@
 import 'dart:io';
 
+import 'package:build_ntd/src/builder/build_config.dart';
+import 'package:build_ntd/src/builder/output_template.dart';
 import 'package:path/path.dart' as p;
 import 'package:yaml/yaml.dart';
 
 /// Result of [writeBuildNtdSample].
 class SampleResult {
-  SampleResult({required this.pubspecPath, required this.appNameUsed});
+  SampleResult({
+    required this.pubspecPath,
+    required this.appNameUsed,
+    required this.sectionAppended,
+  });
 
-  /// Relative path of the file that was modified.
+  /// Relative path of the pubspec file.
   final String pubspecPath;
 
-  /// The value written into `app_name:` — either the project's `name:` from
-  /// pubspec, or the fallback placeholder.
+  /// The value living under `app_name:` — either freshly written or read from
+  /// the existing section.
   final String appNameUsed;
+
+  /// `true` if this call appended a new section, `false` if a `build_ntd:`
+  /// section was already present and we left it alone.
+  final bool sectionAppended;
+}
+
+/// Sample filename preview produced by [previewOutputNames].
+class OutputPreview {
+  OutputPreview({required this.apk, required this.bundle});
+  final String apk;
+  final String bundle;
 }
 
 /// Fallback `app_name` when the host pubspec has no `name:` field.
 const _fallbackAppName = 'my_flutter_app';
 
 /// Appends a fully-commented `build_ntd:` section to `pubspec.yaml` at
-/// [projectRoot].
+/// [projectRoot] if one isn't already present.
 ///
 /// - Auto-fills `app_name` from the host pubspec's `name:` field when
 ///   available, otherwise uses [_fallbackAppName].
-/// - Refuses if a `build_ntd:` section already exists.
+/// - If `build_ntd:` already exists, the file is left untouched and the
+///   returned [SampleResult.sectionAppended] is `false`.
 /// - Normalizes trailing whitespace so the file ends with a single newline.
 ///
-/// Throws [PubspecSampleException] for unrecoverable errors.
+/// Throws [PubspecSampleException] only for unrecoverable errors (missing
+/// pubspec.yaml).
 SampleResult writeBuildNtdSample(String projectRoot) {
   final pubspecPath = p.join(projectRoot, 'pubspec.yaml');
   final file = File(pubspecPath);
@@ -36,29 +55,120 @@ SampleResult writeBuildNtdSample(String projectRoot) {
 
   final source = file.readAsStringSync();
   final doc = source.trim().isEmpty ? null : loadYaml(source);
+  final relativePath = p.relative(pubspecPath, from: projectRoot);
 
+  // Section already present — leave the file alone, return existing app_name.
   if (doc is YamlMap && doc['build_ntd'] != null) {
-    throw PubspecSampleException(
-      'build_ntd: section already exists in pubspec.yaml. '
-      'Remove it first or edit it manually.',
+    final section = doc['build_ntd'];
+    final appName = section is YamlMap
+        ? section['app_name']?.toString() ?? ''
+        : '';
+    return SampleResult(
+      pubspecPath: relativePath,
+      appNameUsed: appName,
+      sectionAppended: false,
     );
   }
 
   final projectName =
       (doc is YamlMap ? doc['name']?.toString() : null) ?? _fallbackAppName;
-
-  // Strip trailing whitespace then re-attach a single trailing newline.
-  // Result: input pubspec  →  trimmed + "\n\n<section>\n"
   final trimmed = source.replaceAll(RegExp(r'\s+$'), '');
   final separator = trimmed.isEmpty ? '' : '\n\n';
   final newContent = '$trimmed$separator${_renderSection(projectName)}\n';
   file.writeAsStringSync(newContent);
 
   return SampleResult(
-    pubspecPath: p.relative(pubspecPath, from: projectRoot),
+    pubspecPath: relativePath,
     appNameUsed: projectName,
+    sectionAppended: true,
   );
 }
+
+/// Renders sample APK and AAB filenames using values from the project's
+/// `build_ntd:` block, gradle (or pubspec) version info, and the current
+/// date/time. The preview always uses an empty flavor (so the underscore
+/// tidy collapses it) and `release` for `buildType`.
+///
+/// Returns `null` if the project doesn't have a usable `build_ntd:` block
+/// (e.g. `app_id` or `app_name` missing). When version info can't be read,
+/// uses `<x.y.z>` / `<N>` as placeholders so the preview still works.
+OutputPreview? previewOutputNames(String projectRoot) {
+  final BuildConfig config;
+  try {
+    config = BuildConfig.load(projectRoot);
+  } on BuildConfigException {
+    return null;
+  }
+
+  var versionName = '<x.y.z>';
+  var versionCode = '<N>';
+  try {
+    final gradle = GradleVersionInfo.load(projectRoot);
+    versionName = gradle.versionName;
+    versionCode = gradle.versionCode;
+  } on BuildConfigException {
+    // No gradle file (typical fresh project before `flutter create`). Try
+    // reading `version:` from pubspec directly — same semantics as gradle's
+    // dynamic-ref fallback.
+    final fromPubspec = _tryReadPubspecVersion(projectRoot);
+    if (fromPubspec != null) {
+      versionName = fromPubspec.$1;
+      versionCode = fromPubspec.$2;
+    }
+  }
+
+  final now = DateTime.now();
+  final variables = <String, String>{
+    'appId': config.appId,
+    'appname': config.appName,
+    'versionName': versionName,
+    'versionCode': versionCode,
+    'buildDate': _formatDate(now),
+    'buildTime': _formatTime(now),
+    'flavor': '',
+    'buildType': 'release',
+  };
+
+  String render(String template, String extension) {
+    final rendered = renderTemplate(template, variables);
+    return enforceExtension(tidyOutputName(rendered), extension);
+  }
+
+  // Custom output_name applies to both apk and bundle; each command swaps
+  // its own extension. If unset, fall back to the format-specific defaults.
+  final apkTemplate =
+      config.outputNameTemplate ?? defaultOutputNameTemplate;
+  final bundleTemplate =
+      config.outputNameTemplate ?? defaultBundleOutputNameTemplate;
+
+  return OutputPreview(
+    apk: render(apkTemplate, '.apk'),
+    bundle: render(bundleTemplate, '.aab'),
+  );
+}
+
+/// Parses `version: x.y.z+N` from pubspec.yaml. Returns `(name, code)` —
+/// build number defaults to `'1'` when `+N` is missing, matching how
+/// [GradleVersionInfo] handles the dynamic-ref fallback.
+(String, String)? _tryReadPubspecVersion(String projectRoot) {
+  final file = File(p.join(projectRoot, 'pubspec.yaml'));
+  if (!file.existsSync()) return null;
+  final doc = loadYaml(file.readAsStringSync());
+  if (doc is! YamlMap) return null;
+  final version = doc['version']?.toString();
+  if (version == null) return null;
+  final parts = version.split('+');
+  return (parts[0], parts.length > 1 ? parts[1] : '1');
+}
+
+String _formatDate(DateTime t) =>
+    '${t.year.toString().padLeft(4, '0')}.'
+    '${t.month.toString().padLeft(2, '0')}.'
+    '${t.day.toString().padLeft(2, '0')}';
+
+String _formatTime(DateTime t) =>
+    '${t.hour.toString().padLeft(2, '0')}.'
+    '${t.minute.toString().padLeft(2, '0')}';
 
 String _renderSection(String projectName) =>
     '''
