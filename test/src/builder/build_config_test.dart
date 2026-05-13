@@ -35,7 +35,7 @@ void main() {
     setUp(() => project = _newProject());
     tearDown(() => project.delete());
 
-    test('reads app_id, app_name, and uses the default template', () {
+    test('reads app_id and app_name with no template override', () {
       project.writePubspec('''
 name: example
 build_ntd:
@@ -47,7 +47,8 @@ build_ntd:
 
       expect(cfg.appId, '780');
       expect(cfg.appName, 'Muslim');
-      expect(cfg.outputNameTemplate, defaultOutputNameTemplate);
+      // Null signals "use the command's default template".
+      expect(cfg.outputNameTemplate, isNull);
       expect(cfg.outputDir, isNull);
     });
 

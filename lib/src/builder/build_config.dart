@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 import 'package:yaml/yaml.dart';
 
-/// Default output filename template if none is configured in `pubspec.yaml`.
+/// Default APK filename template when none is configured in `pubspec.yaml`.
 const defaultOutputNameTemplate =
     r'App${appId}_${appname}_v${versionName}'
     r'(${versionCode})_${buildDate}_${flavor}_${buildType}.apk';
@@ -57,18 +57,21 @@ class BuildConfig {
     return BuildConfig(
       appId: appId.toString(),
       appName: appName.toString(),
-      outputNameTemplate:
-          (section['output_name'] as String?) ?? defaultOutputNameTemplate,
+      outputNameTemplate: section['output_name'] as String?,
       outputDir: section['output_dir'] as String?,
     );
   }
 
   final String appId;
   final String appName;
-  final String outputNameTemplate;
 
-  /// Destination directory for the renamed APK. `null` means "next to the
-  /// original APK in `build/app/outputs/flutter-apk/`".
+  /// User-supplied template. `null` means "use the command's default".
+  /// Shared between APK and AAB commands; each command coerces the file
+  /// extension via `enforceExtension` at the call site.
+  final String? outputNameTemplate;
+
+  /// Destination directory for the renamed artifact. `null` means "next to
+  /// the original under `build/app/outputs/...`".
   final String? outputDir;
 }
 
