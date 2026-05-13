@@ -6,8 +6,7 @@ import 'package:build_ntd/src/builder/output_template.dart';
 import 'package:mason_logger/mason_logger.dart';
 import 'package:path/path.dart' as p;
 
-/// Shared orchestration for `build_ntd build` (APK) and
-/// `build_ntd bundle` (AAB).
+/// Shared orchestration for `build_ntd apk` and `build_ntd bundle`.
 ///
 /// Subclasses declare what's different — the Flutter subcommand to run, the
 /// artifact extension, the default filename template, and how to locate the

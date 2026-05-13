@@ -49,7 +49,7 @@ From the Flutter project root:
 
 ```sh
 # APK
-build_ntd build  --flavor dev -t lib/main_dev.dart
+build_ntd apk    --flavor dev -t lib/main_dev.dart
 
 # AAB
 build_ntd bundle --flavor dev -t lib/main_dev.dart

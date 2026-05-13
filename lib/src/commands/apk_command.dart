@@ -5,11 +5,11 @@ import 'package:build_ntd/src/builder/build_config.dart';
 import 'package:build_ntd/src/commands/android_build_command.dart';
 
 /// Builds a Flutter APK and copies it to a name derived from a template.
-class BuildCommand extends AndroidBuildCommand {
-  BuildCommand({required super.logger});
+class ApkCommand extends AndroidBuildCommand {
+  ApkCommand({required super.logger});
 
   @override
-  String get name => 'build';
+  String get name => 'apk';
 
   @override
   String get description =>
