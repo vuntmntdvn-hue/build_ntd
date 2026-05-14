@@ -19,6 +19,7 @@ From this repo:
 
 ```sh
 dart pub global activate --source=path <path to this package>
+# For example (After cloning): dart pub global activate --source=path ./build_ntd
 ```
 
 Make sure pub's global bin directory is on your `PATH`
