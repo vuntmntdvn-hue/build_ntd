@@ -63,6 +63,9 @@ build_ntd apk    --flavor dev -t lib/main_dev.dart
 # AAB
 build_ntd bundle --flavor dev -t lib/main_dev.dart
 
+# Build APK and install it on a connected Android device (via adb)
+build_ntd install --flavor dev -t lib/main_dev.dart
+
 # Bump versionCode by 1, or set it explicitly
 build_ntd bump
 build_ntd bump 12

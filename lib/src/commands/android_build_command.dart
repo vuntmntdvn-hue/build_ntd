@@ -58,6 +58,10 @@ abstract class AndroidBuildCommand extends Command<int> {
 
   final Logger _logger;
 
+  /// Exposed so subclasses (which live in their own libraries) can log
+  /// through the same instance configured by the runner.
+  Logger get logger => _logger;
+
   // ---- Subclass hooks ----
 
   /// The flutter subcommand to invoke: `apk` or `appbundle`.
@@ -77,6 +81,12 @@ abstract class AndroidBuildCommand extends Command<int> {
     required String mode,
     String? flavor,
   });
+
+  /// Called after the artifact is built, renamed, copied, and (optionally)
+  /// placed on the clipboard. Returns the exit code of any extra step.
+  /// Default: success no-op. Subclasses (e.g. `install`) override to chain
+  /// post-build work such as `adb install`.
+  Future<int> onBuildSuccess(File artifact) async => ExitCode.success.code;
 
   // ---- Shared run() ----
 
@@ -176,7 +186,7 @@ abstract class AndroidBuildCommand extends Command<int> {
       await _putOnClipboard(destPath);
     }
 
-    return ExitCode.success.code;
+    return onBuildSuccess(File(destPath));
   }
 
   Future<void> _putOnClipboard(String path) async {
