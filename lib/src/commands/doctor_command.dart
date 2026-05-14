@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:args/command_runner.dart';
 import 'package:build_ntd/src/builder/build_config.dart';
+import 'package:build_ntd/src/builder/git_info.dart';
 import 'package:build_ntd/src/builder/pubspec_sample.dart';
 import 'package:build_ntd/src/version.dart';
 import 'package:mason_logger/mason_logger.dart';
@@ -35,9 +36,24 @@ class DoctorCommand extends Command<int> {
     _configuration(root);
     _versionInfo(root);
     _templatesAndPreview(root);
+    await _git(root);
     await _tools();
 
     return ExitCode.success.code;
+  }
+
+  Future<void> _git(String root) async {
+    _section('Git');
+    final git = await readGitInfo(root);
+    if (git == null) {
+      _logger.info(
+        darkGray.wrap('  (not a git repo or git not installed)'),
+      );
+      return;
+    }
+    _row('commit', '${git.shortSha}  (${git.fullSha})');
+    _row('branch', git.branch ?? '(detached)');
+    _row('status', git.statusLabel);
   }
 
   // ----- Sections -----

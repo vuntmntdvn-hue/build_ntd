@@ -85,6 +85,7 @@ Both commands accept the same options:
 --output-dir   Override the destination directory
 --output-name  Override the filename template
 --no-copy      Skip copying the produced artifact to the clipboard
+--no-record    Skip writing a row to build_ntd_records.md
 ```
 
 On success, the renamed artifact is also copied to the system clipboard
@@ -97,6 +98,29 @@ so you can paste it straight into a chat or upload dialog:
   Linux varies by desktop environment and isn't handled.
 
 Pass `--no-copy` to disable on CI or scripts.
+
+## Build records
+
+Every successful `apk` / `bundle` / `install` appends a row to
+`build_ntd_records.md` at the project root, so you can look up which
+commit a given APK came from weeks later:
+
+```markdown
+# build_ntd build records
+
+| When             | Artifact                                                 | Commit  | Branch | Status |
+|------------------|----------------------------------------------------------|---------|--------|--------|
+| 2026-05-13 14:30 | App780_Muslim_v1.0.0(5)_2026.05.13_14.30_dev_release.apk | a1b2c3d | main   | clean  |
+| 2026-05-13 15:45 | App780_Muslim_v1.0.0(6)_2026.05.13_15.45_dev_release.aab | b2c3d4e | main   | dirty  |
+```
+
+Git info comes from the local `git` CLI. When the project isn't a git
+repo (or `git` isn't installed) the commit/branch/status columns show
+em-dashes; the artifact row still gets written.
+
+Pass `--no-record` to suppress the append (CI, scripts, throwaway
+builds). Whether to commit `build_ntd_records.md` to your repo is your
+call — it's not added to `.gitignore` automatically.
 
 `output_name:` and `output_dir:` in `pubspec.yaml` are shared between the
 two commands. The artifact extension (`.apk` / `.aab`) is appended — or

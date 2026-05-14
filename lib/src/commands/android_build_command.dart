@@ -2,8 +2,10 @@ import 'dart:io';
 
 import 'package:args/command_runner.dart';
 import 'package:build_ntd/src/builder/build_config.dart';
+import 'package:build_ntd/src/builder/build_records.dart';
 import 'package:build_ntd/src/builder/clipboard.dart';
 import 'package:build_ntd/src/builder/formats.dart';
+import 'package:build_ntd/src/builder/git_info.dart';
 import 'package:build_ntd/src/builder/output_template.dart';
 import 'package:mason_logger/mason_logger.dart';
 import 'package:path/path.dart' as p;
@@ -53,6 +55,12 @@ abstract class AndroidBuildCommand extends Command<int> {
         defaultsTo: true,
         help: 'Copy the produced artifact to the system clipboard on '
             'success. Use --no-copy to disable.',
+      )
+      ..addFlag(
+        'record',
+        defaultsTo: true,
+        help: 'Append a row to build_ntd_records.md after a successful '
+            'build. Use --no-record to disable.',
       );
   }
 
@@ -186,7 +194,31 @@ abstract class AndroidBuildCommand extends Command<int> {
       await _putOnClipboard(destPath);
     }
 
+    if (args['record'] as bool) {
+      await _writeRecord(projectRoot, destPath);
+    }
+
     return onBuildSuccess(File(destPath));
+  }
+
+  Future<void> _writeRecord(String projectRoot, String destPath) async {
+    try {
+      final git = await readGitInfo(projectRoot);
+      appendBuildRecord(
+        projectRoot,
+        BuildRecord(
+          timestamp: DateTime.now(),
+          artifact: p.basename(destPath),
+          git: git,
+        ),
+      );
+    } on Object catch (e) {
+      // Recording is a best-effort QOL feature — never block a successful
+      // build because of it.
+      _logger.info(
+        darkGray.wrap('  could not write build_ntd_records.md: $e'),
+      );
+    }
   }
 
   Future<void> _putOnClipboard(String path) async {
