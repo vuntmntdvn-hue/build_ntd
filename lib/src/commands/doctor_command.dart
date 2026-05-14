@@ -8,6 +8,7 @@ import 'package:build_ntd/src/builder/pubspec_sample.dart';
 import 'package:build_ntd/src/version.dart';
 import 'package:mason_logger/mason_logger.dart';
 import 'package:path/path.dart' as p;
+import 'package:yaml/yaml.dart';
 
 /// Prints a diagnostic dump of what `build_ntd` sees in the current project,
 /// without running flutter. Useful when something behaves unexpectedly.
@@ -111,21 +112,61 @@ class DoctorCommand extends Command<int> {
 
     try {
       final info = GradleVersionInfo.load(root);
-      final codeSource = codeLiteral != null
-          ? 'gradle literal'
-          : (hasDynamicCode
-                ? 'pubspec version: (gradle uses dynamic ref)'
-                : 'pubspec version:');
-      final nameSource = nameLiteral != null
-          ? 'gradle literal'
-          : (hasDynamicName
-                ? 'pubspec version: (gradle uses dynamic ref)'
-                : 'pubspec version:');
-      _row('versionName', '${info.versionName}  (from $nameSource)');
-      _row('versionCode', '${info.versionCode}  (from $codeSource)');
+      _row('versionName', '${info.versionName}  '
+          '${_sourceLabel(nameLiteral != null, hasDynamicName)}');
+      _row('versionCode', '${info.versionCode}  '
+          '${_sourceLabel(codeLiteral != null, hasDynamicCode)}');
     } on BuildConfigException catch (e) {
       _logger.info(lightYellow.wrap('  ${e.message}'));
     }
+
+    // Tweak 2: warn when both gradle and pubspec carry literal values and
+    // they disagree. Gradle wins for reading; without a warning here the
+    // discrepancy would be silent until someone wonders why their pubspec
+    // build number doesn't match.
+    final pubspec = _readPubspecVersion(root);
+    if (pubspec != null) {
+      if (codeLiteral != null && pubspec.code != null) {
+        final gradleCode = codeLiteral.group(1);
+        if (gradleCode != pubspec.code) {
+          _warn(
+            'versionCode mismatch: gradle says $gradleCode, '
+            'pubspec says ${pubspec.code} (using gradle). '
+            'Run `build_ntd bump $gradleCode` to sync.',
+          );
+        }
+      }
+      if (nameLiteral != null) {
+        final gradleName = nameLiteral.group(1);
+        if (gradleName != pubspec.name) {
+          _warn(
+            'versionName mismatch: gradle says "$gradleName", '
+            'pubspec says "${pubspec.name}".',
+          );
+        }
+      }
+    }
+  }
+
+  /// Human-readable suffix describing where the resolved value came from.
+  String _sourceLabel(bool hasLiteral, bool gradleHasDynamicRef) {
+    if (hasLiteral) return '(gradle literal)';
+    if (gradleHasDynamicRef) return '(pubspec, via gradle dynamic ref)';
+    return '(pubspec)';
+  }
+
+  /// Parses pubspec.yaml's `version: x.y.z+N` field. Returns null when
+  /// pubspec.yaml is missing or has no `version:` field.
+  ({String name, String? code})? _readPubspecVersion(String root) {
+    final pubspec = File(p.join(root, 'pubspec.yaml'));
+    if (!pubspec.existsSync()) return null;
+    final doc = loadYaml(pubspec.readAsStringSync());
+    if (doc is! YamlMap) return null;
+    final raw = doc['version']?.toString();
+    if (raw == null) return null;
+    final plus = raw.indexOf('+');
+    if (plus == -1) return (name: raw, code: null);
+    return (name: raw.substring(0, plus), code: raw.substring(plus + 1));
   }
 
   void _templatesAndPreview(String root) {
