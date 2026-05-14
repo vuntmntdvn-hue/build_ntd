@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:args/command_runner.dart';
 import 'package:build_ntd/src/builder/build_config.dart';
 import 'package:build_ntd/src/builder/clipboard.dart';
+import 'package:build_ntd/src/builder/formats.dart';
 import 'package:build_ntd/src/builder/output_template.dart';
 import 'package:mason_logger/mason_logger.dart';
 import 'package:path/path.dart' as p;
@@ -135,7 +136,9 @@ abstract class AndroidBuildCommand extends Command<int> {
     ];
 
     _logger.info('Running: flutter ${flutterArgs.join(' ')}');
+    final stopwatch = Stopwatch()..start();
     final exitCode = await _runFlutter(flutterArgs);
+    stopwatch.stop();
     if (exitCode != 0) {
       _logger.err('flutter build $flutterSubcommand failed '
           'with exit code $exitCode.');
@@ -161,7 +164,13 @@ abstract class AndroidBuildCommand extends Command<int> {
       return ExitCode.ioError.code;
     }
 
-    _logger.info(lightGreen.wrap('Artifact copied to $destPath'));
+    final size = formatBytes(File(destPath).lengthSync());
+    final duration = formatDuration(stopwatch.elapsed);
+    _logger.info(
+      lightGreen.wrap(
+        'Artifact copied to $destPath ($size, built in $duration)',
+      ),
+    );
 
     if (args['copy'] as bool) {
       await _putOnClipboard(destPath);
