@@ -63,8 +63,10 @@ build_ntd apk    --flavor dev -t lib/main_dev.dart
 # AAB
 build_ntd bundle --flavor dev -t lib/main_dev.dart
 
-# Build APK and install it on a connected Android device (via adb)
-build_ntd install --flavor dev -t lib/main_dev.dart
+# Install an existing APK on a connected Android device (via adb)
+build_ntd install App780_Muslim_v1.0.0(5)_..._release.apk   # by name
+build_ntd install --latest                                  # most recent .apk
+build_ntd install                                           # implied --latest
 
 # Bump versionCode by 1, or set it explicitly
 build_ntd bump
@@ -98,6 +100,27 @@ so you can paste it straight into a chat or upload dialog:
   Linux varies by desktop environment and isn't handled.
 
 Pass `--no-copy` to disable on CI or scripts.
+
+## `install` — push an APK to a device
+
+```sh
+build_ntd install <apk-file>   # explicit, by basename or path
+build_ntd install --latest     # most recently modified .apk
+build_ntd install              # same as --latest
+```
+
+`install` does **not** build — pair it with a prior `build_ntd apk`.
+The argument can be a basename (resolved in the search locations below)
+or a path. Without an argument (or with `--latest`), the most recently
+modified `.apk` across the search locations is installed.
+
+Search order for basename / `--latest`:
+
+1. Project root (current working directory)
+2. `output_dir` from pubspec's `build_ntd:` section (if set)
+3. `build/app/outputs/flutter-apk/` (Flutter's default APK landing zone)
+
+Under the hood: `adb install -r <path>` — `adb` must be on PATH.
 
 ## Build records
 
