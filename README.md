@@ -69,6 +69,9 @@ build_ntd install --flavor dev -t lib/main_dev.dart
 # Bump versionCode by 1, or set it explicitly
 build_ntd bump
 build_ntd bump 12
+
+# Print a diagnostic dump of how build_ntd reads this project
+build_ntd doctor
 ```
 
 Both commands accept the same options:
